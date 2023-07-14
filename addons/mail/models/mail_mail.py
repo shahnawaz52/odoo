@@ -43,7 +43,8 @@ class MailMail(models.Model):
     # content
     mail_message_id = fields.Many2one('mail.message', 'Message', required=True, ondelete='cascade', index=True, auto_join=True)
     mail_message_id_int = fields.Integer(compute='_compute_mail_message_id_int', compute_sudo=True)
-    body_html = fields.Text('Rich-text Contents', help="Rich-text/HTML message")
+    body_html = fields.Text('Text Contents', help="Rich-text/HTML message")
+    body_content = fields.Html('Rich-text Contents', sanitize=True, compute='_compute_body_content', search="_search_body_content")
     references = fields.Text('References', help='Message references, such as identifiers of previous messages', readonly=1)
     headers = fields.Text('Headers', copy=False)
     restricted_attachment_count = fields.Integer('Restricted attachments', compute='_compute_restricted_attachments')
@@ -90,6 +91,10 @@ class MailMail(models.Model):
         help="If set, the queue manager will send the email after the date. If not set, the email will be send as soon as possible. Unless a timezone is specified, it is considered as being in UTC timezone.")
     fetchmail_server_id = fields.Many2one('fetchmail.server', "Inbound Mail Server", readonly=True)
 
+    def _compute_body_content(self):
+        for mail in self:
+            mail.body_content = mail.body_html
+
     def _compute_mail_message_id_int(self):
         for mail in self:
             mail.mail_message_id_int = mail.mail_message_id.id
@@ -111,6 +116,9 @@ class MailMail(models.Model):
         for mail_sudo, mail in zip(self.sudo(), self):
             restricted_attaments = mail_sudo.attachment_ids - IrAttachment._filter_attachment_access(mail_sudo.attachment_ids.ids)
             mail_sudo.attachment_ids = restricted_attaments | mail.unrestricted_attachment_ids
+
+    def _search_body_content(self, operator, value):
+        return [('body_html', operator, value)]
 
     @api.model_create_multi
     def create(self, values_list):

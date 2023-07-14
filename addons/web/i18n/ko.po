@@ -7,7 +7,8 @@
 # Seongseok Shin <shinss61@hotmail.com>, 2022
 # Mark Lee <odoos@soti.33mail.com>, 2022
 # JH CHOI <hwangtog@gmail.com>, 2022
-# Martin Trigaux, 2022
+# Martin Trigaux, 2023
+# Daye Jeong, 2023
 # Sarah Park, 2023
 # 
 msgid ""
@@ -17,7 +18,7 @@ msgstr ""
 "POT-Creation-Date: 2023-02-02 10:35+0000\n"
 "PO-Revision-Date: 2022-09-22 05:55+0000\n"
 "Last-Translator: Sarah Park, 2023\n"
-"Language-Team: Korean (https://www.transifex.com/odoo/teams/41243/ko/)\n"
+"Language-Team: Korean (https://app.transifex.com/odoo/teams/41243/ko/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
@@ -880,6 +881,7 @@ msgstr "모든 레코드를 보관하시겠습니까?"
 
 #. module: web
 #. odoo-javascript
+#: code:addons/web/static/src/views/form/form_controller.js:0
 #: code:addons/web/static/src/legacy/js/views/form/form_controller.js:0
 #, python-format
 msgid "Are you sure that you want to archive this record?"
@@ -1123,6 +1125,8 @@ msgid ""
 " all purposes when it is used on documents, including legally binding "
 "contracts."
 msgstr ""
+"쓰기 및 서명을 클릭함으로써 본인이 선택한 서명/이니셜이 법적 구속력이 있는 계약을 포함한 모든 용도로 문서에 사용되었을 때 자필 "
+"서명/이니셜의 유효한 전자적 의사 표현이 된다는 것에 동의합니다."
 
 #. module: web
 #. odoo-javascript
@@ -1445,7 +1449,7 @@ msgstr "문맥 :"
 #: code:addons/web/static/src/views/list/list_controller.xml:0
 #, python-format
 msgid "Control panel buttons"
-msgstr ""
+msgstr "제어판 버튼 "
 
 #. module: web
 #. odoo-javascript
@@ -1667,7 +1671,7 @@ msgstr ""
 #: code:addons/web/static/src/views/fields/x2many/x2many_field.xml:0
 #, python-format
 msgid "Create record"
-msgstr ""
+msgstr "레코드 생성"
 
 #. module: web
 #. odoo-javascript
@@ -1958,7 +1962,7 @@ msgstr "변경 사항 취소"
 #: code:addons/web/static/src/legacy/xml/base.xml:0
 #, python-format
 msgid "Discard record"
-msgstr ""
+msgstr "기록 삭제"
 
 #. module: web
 #: model:ir.model.fields,field_description:web.field_base_document_layout__display_name
@@ -2194,7 +2198,7 @@ msgstr ""
 #: code:addons/web/static/src/core/debug/profiling/profiling_item.xml:0
 #, python-format
 msgid "Enable profiling"
-msgstr ""
+msgstr "프로필 활성화"
 
 #. module: web
 #. odoo-javascript
@@ -2208,7 +2212,7 @@ msgstr "이메일 주소를 입력하세요"
 #: code:addons/web/static/src/webclient/settings_form_view/highlight_text/form_label_highlight_text.xml:0
 #, python-format
 msgid "Enterprise"
-msgstr ""
+msgstr "기업"
 
 #. module: web
 #. odoo-javascript
@@ -2589,7 +2593,7 @@ msgstr "핸들"
 #. module: web
 #: model:ir.model.fields,help:web.field_base_document_layout__company_details
 msgid "Header text displayed at the top of all reports."
-msgstr ""
+msgstr "모든 보고서에서 상단에 표시되는 머리글 문구입니다."
 
 #. module: web
 #. odoo-javascript
@@ -4631,7 +4635,7 @@ msgstr "직접 저장하기"
 #: code:addons/web/static/src/legacy/xml/base.xml:0
 #, python-format
 msgid "Save record"
-msgstr ""
+msgstr "기록 저장"
 
 #. module: web
 #. odoo-javascript
@@ -4804,7 +4808,7 @@ msgstr "보기 선택"
 #: code:addons/web/static/src/views/list/list_controller.xml:0
 #, python-format
 msgid "Select all"
-msgstr ""
+msgstr "전체 선택"
 
 #. module: web
 #. odoo-javascript
@@ -4926,6 +4930,13 @@ msgstr "설정"
 #, python-format
 msgid "Share with all users"
 msgstr "모든 사용자들과 공유"
+
+#. module: web
+#. odoo-javascript
+#: code:addons/web/static/src/webclient/user_menu/user_menu_items.js:0
+#, python-format
+msgid "Shortcuts"
+msgstr "바로 가기"
 
 #. module: web
 #. odoo-javascript
@@ -5978,6 +5989,21 @@ msgstr "믿기시지 않겠지만<br />응용 프로그램을 실제로 불러�
 
 #. module: web
 #. odoo-javascript
+#: code:addons/web/static/src/views/fields/properties/property_tags.js:0
+#, python-format
+msgid "You need to be able to edit parent first to add property tags"
+msgstr ""
+
+#. module: web
+#. odoo-javascript
+#: code:addons/web/static/src/views/fields/properties/properties_field.js:0
+#: code:addons/web/static/src/views/fields/properties/properties_field.js:0
+#, python-format
+msgid "You need to be able to edit parent first to configure property fields"
+msgstr ""
+
+#. module: web
+#. odoo-javascript
 #: code:addons/web/static/src/legacy/js/views/basic/basic_controller.js:0
 #: code:addons/web/static/src/views/fields/translation_button.js:0
 #, python-format
@@ -6463,7 +6489,7 @@ msgstr "다음보다 작거나 같음"
 #: code:addons/web/static/src/core/domain_selector/domain_selector_operators.js:0
 #, python-format
 msgid "like"
-msgstr ""
+msgstr "좋아요"
 
 #. module: web
 #. odoo-javascript

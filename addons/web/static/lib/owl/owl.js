@@ -178,11 +178,21 @@
     }
     function attrsSetter(attrs) {
         if (isArray(attrs)) {
-            setAttribute.call(this, attrs[0], attrs[1]);
+            if (attrs[0] === "class") {
+                setClass.call(this, attrs[1]);
+            }
+            else {
+                setAttribute.call(this, attrs[0], attrs[1]);
+            }
         }
         else {
             for (let k in attrs) {
-                setAttribute.call(this, k, attrs[k]);
+                if (k === "class") {
+                    setClass.call(this, attrs[k]);
+                }
+                else {
+                    setAttribute.call(this, k, attrs[k]);
+                }
             }
         }
     }
@@ -194,7 +204,12 @@
                 if (val === oldAttrs[1]) {
                     return;
                 }
-                setAttribute.call(this, name, val);
+                if (name === "class") {
+                    updateClass.call(this, val, oldAttrs[1]);
+                }
+                else {
+                    setAttribute.call(this, name, val);
+                }
             }
             else {
                 removeAttribute.call(this, oldAttrs[0]);
@@ -204,13 +219,23 @@
         else {
             for (let k in oldAttrs) {
                 if (!(k in attrs)) {
-                    removeAttribute.call(this, k);
+                    if (k === "class") {
+                        updateClass.call(this, "", oldAttrs[k]);
+                    }
+                    else {
+                        removeAttribute.call(this, k);
+                    }
                 }
             }
             for (let k in attrs) {
                 const val = attrs[k];
                 if (val !== oldAttrs[k]) {
-                    setAttribute.call(this, k, val);
+                    if (k === "class") {
+                        updateClass.call(this, val, oldAttrs[k]);
+                    }
+                    else {
+                        setAttribute.call(this, k, val);
+                    }
                 }
             }
         }
@@ -281,6 +306,96 @@
         }
     }
 
+    /**
+     * Creates a batched version of a callback so that all calls to it in the same
+     * microtick will only call the original callback once.
+     *
+     * @param callback the callback to batch
+     * @returns a batched version of the original callback
+     */
+    function batched(callback) {
+        let called = false;
+        return async () => {
+            // This await blocks all calls to the callback here, then releases them sequentially
+            // in the next microtick. This line decides the granularity of the batch.
+            await Promise.resolve();
+            if (!called) {
+                called = true;
+                // wait for all calls in this microtick to fall through before resetting "called"
+                // so that only the first call to the batched function calls the original callback.
+                // Schedule this before calling the callback so that calls to the batched function
+                // within the callback will proceed only after resetting called to false, and have
+                // a chance to execute the callback again
+                Promise.resolve().then(() => (called = false));
+                callback();
+            }
+        };
+    }
+    /**
+     * Determine whether the given element is contained in its ownerDocument:
+     * either directly or with a shadow root in between.
+     */
+    function inOwnerDocument(el) {
+        if (!el) {
+            return false;
+        }
+        if (el.ownerDocument.contains(el)) {
+            return true;
+        }
+        const rootNode = el.getRootNode();
+        return rootNode instanceof ShadowRoot && el.ownerDocument.contains(rootNode.host);
+    }
+    function validateTarget(target) {
+        // Get the document and HTMLElement corresponding to the target to allow mounting in iframes
+        const document = target && target.ownerDocument;
+        if (document) {
+            const HTMLElement = document.defaultView.HTMLElement;
+            if (target instanceof HTMLElement || target instanceof ShadowRoot) {
+                if (!document.body.contains(target instanceof HTMLElement ? target : target.host)) {
+                    throw new OwlError("Cannot mount a component on a detached dom node");
+                }
+                return;
+            }
+        }
+        throw new OwlError("Cannot mount component: the target is not a valid DOM element");
+    }
+    class EventBus extends EventTarget {
+        trigger(name, payload) {
+            this.dispatchEvent(new CustomEvent(name, { detail: payload }));
+        }
+    }
+    function whenReady(fn) {
+        return new Promise(function (resolve) {
+            if (document.readyState !== "loading") {
+                resolve(true);
+            }
+            else {
+                document.addEventListener("DOMContentLoaded", resolve, false);
+            }
+        }).then(fn || function () { });
+    }
+    async function loadFile(url) {
+        const result = await fetch(url);
+        if (!result.ok) {
+            throw new OwlError("Error while fetching xml templates");
+        }
+        return await result.text();
+    }
+    /*
+     * This class just transports the fact that a string is safe
+     * to be injected as HTML. Overriding a JS primitive is quite painful though
+     * so we need to redfine toString and valueOf.
+     */
+    class Markup extends String {
+    }
+    /*
+     * Marks a value as safe, that is, a value that can be injected as HTML directly.
+     * It should be used to wrap the value passed to a t-out directive to allow a raw rendering.
+     */
+    function markup(value) {
+        return new Markup(value);
+    }
+
     function createEventHandler(rawEvent) {
         const eventName = rawEvent.split(".")[0];
         const capture = rawEvent.includes(".capture");
@@ -300,7 +415,7 @@
         }
         function listener(ev) {
             const currentTarget = ev.currentTarget;
-            if (!currentTarget || !currentTarget.ownerDocument.contains(currentTarget))
+            if (!currentTarget || !inOwnerDocument(currentTarget))
                 return;
             const data = currentTarget[eventKey];
             if (!data)
@@ -2165,82 +2280,6 @@
         });
     }
 
-    /**
-     * Creates a batched version of a callback so that all calls to it in the same
-     * microtick will only call the original callback once.
-     *
-     * @param callback the callback to batch
-     * @returns a batched version of the original callback
-     */
-    function batched(callback) {
-        let called = false;
-        return async () => {
-            // This await blocks all calls to the callback here, then releases them sequentially
-            // in the next microtick. This line decides the granularity of the batch.
-            await Promise.resolve();
-            if (!called) {
-                called = true;
-                // wait for all calls in this microtick to fall through before resetting "called"
-                // so that only the first call to the batched function calls the original callback.
-                // Schedule this before calling the callback so that calls to the batched function
-                // within the callback will proceed only after resetting called to false, and have
-                // a chance to execute the callback again
-                Promise.resolve().then(() => (called = false));
-                callback();
-            }
-        };
-    }
-    function validateTarget(target) {
-        // Get the document and HTMLElement corresponding to the target to allow mounting in iframes
-        const document = target && target.ownerDocument;
-        if (document) {
-            const HTMLElement = document.defaultView.HTMLElement;
-            if (target instanceof HTMLElement) {
-                if (!document.body.contains(target)) {
-                    throw new OwlError("Cannot mount a component on a detached dom node");
-                }
-                return;
-            }
-        }
-        throw new OwlError("Cannot mount component: the target is not a valid DOM element");
-    }
-    class EventBus extends EventTarget {
-        trigger(name, payload) {
-            this.dispatchEvent(new CustomEvent(name, { detail: payload }));
-        }
-    }
-    function whenReady(fn) {
-        return new Promise(function (resolve) {
-            if (document.readyState !== "loading") {
-                resolve(true);
-            }
-            else {
-                document.addEventListener("DOMContentLoaded", resolve, false);
-            }
-        }).then(fn || function () { });
-    }
-    async function loadFile(url) {
-        const result = await fetch(url);
-        if (!result.ok) {
-            throw new OwlError("Error while fetching xml templates");
-        }
-        return await result.text();
-    }
-    /*
-     * This class just transports the fact that a string is safe
-     * to be injected as HTML. Overriding a JS primitive is quite painful though
-     * so we need to redfine toString and valueOf.
-     */
-    class Markup extends String {
-    }
-    /*
-     * Marks a value as safe, that is, a value that can be injected as HTML directly.
-     * It should be used to wrap the value passed to a t-out directive to allow a raw rendering.
-     */
-    function markup(value) {
-        return new Markup(value);
-    }
-
     let currentNode = null;
     function getCurrent() {
         if (!currentNode) {
@@ -2292,6 +2331,7 @@
             this.bdom = null;
             this.status = 0 /* NEW */;
             this.forceNextRender = false;
+            this.nextProps = null;
             this.children = Object.create(null);
             this.refs = {};
             this.willStart = [];
@@ -2421,7 +2461,7 @@
             this.status = 2 /* DESTROYED */;
         }
         async updateAndRender(props, parentFiber) {
-            const rawProps = props;
+            this.nextProps = props;
             props = Object.assign({}, props);
             // update
             const fiber = makeChildFiber(this, parentFiber);
@@ -2445,7 +2485,6 @@
                 return;
             }
             component.props = props;
-            this.props = rawProps;
             fiber.render();
             const parentRoot = parentFiber.root;
             if (this.willPatch.length) {
@@ -2520,6 +2559,7 @@
                 // by the component will be patched independently in the appropriate
                 // fiber.complete
                 this._patch();
+                this.props = this.nextProps;
             }
         }
         _patch() {
@@ -2870,14 +2910,27 @@
         if ("element" in descr) {
             result = validateArrayType(key, value, descr.element);
         }
-        else if ("shape" in descr && !result) {
+        else if ("shape" in descr) {
             if (typeof value !== "object" || Array.isArray(value)) {
                 result = `'${key}' is not an object`;
             }
             else {
                 const errors = validateSchema(value, descr.shape);
                 if (errors.length) {
-                    result = `'${key}' has not the correct shape (${errors.join(", ")})`;
+                    result = `'${key}' doesn't have the correct shape (${errors.join(", ")})`;
+                }
+            }
+        }
+        else if ("values" in descr) {
+            if (typeof value !== "object" || Array.isArray(value)) {
+                result = `'${key}' is not an object`;
+            }
+            else {
+                const errors = Object.entries(value)
+                    .map(([key, value]) => validateType(key, value, descr.values))
+                    .filter(Boolean);
+                if (errors.length) {
+                    result = `some of the values in '${key}' are invalid (${errors.join(", ")})`;
                 }
             }
         }
@@ -2992,7 +3045,7 @@
      * Safely outputs `value` as a block depending on the nature of `value`
      */
     function safeOutput(value, defaultValue) {
-        if (value === undefined) {
+        if (value === undefined || value === null) {
             return defaultValue ? toggler("default", defaultValue) : toggler("undefined", text(""));
         }
         let safeKey;
@@ -3196,7 +3249,7 @@
         }
         callTemplate(owner, subTemplate, ctx, parent, key) {
             const template = this.getTemplate(subTemplate);
-            return toggler(subTemplate, template.call(owner, ctx, parent, key));
+            return toggler(subTemplate, template.call(owner, ctx, parent, key + subTemplate));
         }
     }
     // -----------------------------------------------------------------------------
@@ -3850,6 +3903,10 @@
             })
                 .join("");
         }
+        translate(str) {
+            const match = translationRE.exec(str);
+            return match[1] + this.translateFn(match[2]) + match[3];
+        }
         /**
          * @returns the newly created block name, if any
          */
@@ -3927,8 +3984,7 @@
             let { block, forceNewBlock } = ctx;
             let value = ast.value;
             if (value && ctx.translate !== false) {
-                const match = translationRE.exec(value);
-                value = match[1] + this.translateFn(match[2]) + match[3];
+                value = this.translate(value);
             }
             if (!ctx.inPreTag) {
                 value = value.replace(whitespaceRE, " ");
@@ -4469,11 +4525,12 @@
             else {
                 let value;
                 if (ast.defaultValue) {
+                    const defaultValue = ctx.translate ? this.translate(ast.defaultValue) : ast.defaultValue;
                     if (ast.value) {
-                        value = `withDefault(${expr}, \`${ast.defaultValue}\`)`;
+                        value = `withDefault(${expr}, \`${defaultValue}\`)`;
                     }
                     else {
-                        value = `\`${ast.defaultValue}\``;
+                        value = `\`${defaultValue}\``;
                     }
                 }
                 else {
@@ -4854,10 +4911,10 @@
         let model = null;
         for (let attr of nodeAttrsNames) {
             const value = node.getAttribute(attr);
-            if (attr.startsWith("t-on")) {
-                if (attr === "t-on") {
-                    throw new OwlError("Missing event name with t-on directive");
-                }
+            if (attr === "t-on" || attr === "t-on-") {
+                throw new OwlError("Missing event name with t-on directive");
+            }
+            if (attr.startsWith("t-on-")) {
                 on = on || {};
                 on[attr.slice(5)] = value;
             }
@@ -5480,8 +5537,8 @@
         return new Function("app, bdom, helpers", code);
     }
 
-    // do not modify manually. This value is updated by the release script.
-    const version = "2.0.9";
+    // do not modify manually. This file is generated by the release script.
+    const version = "2.1.4";
 
     // -----------------------------------------------------------------------------
     //  Scheduler
@@ -5560,6 +5617,8 @@ See https://github.com/odoo/owl/blob/${hash}/doc/reference/app.md#configuration 
         apps: new Set(),
         Fiber: Fiber,
         RootFiber: RootFiber,
+        toRaw: toRaw,
+        reactive: reactive,
     });
     class App extends TemplateSet {
         constructor(Root, config = {}) {
@@ -5774,7 +5833,7 @@ See https://github.com/odoo/owl/blob/${hash}/doc/reference/app.md#configuration 
         return {
             get el() {
                 const el = refs[name];
-                return (el === null || el === void 0 ? void 0 : el.ownerDocument.contains(el)) ? el : null;
+                return inOwnerDocument(el) ? el : null;
             },
         };
     }
@@ -5812,8 +5871,9 @@ See https://github.com/odoo/owl/blob/${hash}/doc/reference/app.md#configuration 
      * will run a cleanup function before patching and before unmounting the
      * the component.
      *
-     * @param {Effect} effect the effect to run on component mount and/or patch
-     * @param {()=>any[]} [computeDependencies=()=>[NaN]] a callback to compute
+     * @template T
+     * @param {Effect<T>} effect the effect to run on component mount and/or patch
+     * @param {()=>T} [computeDependencies=()=>[NaN]] a callback to compute
      *      dependencies that will decide if the effect needs to be cleaned up and
      *      run again. If the dependencies did not change, the effect will not run
      *      again. The default value returns an array containing only NaN because
@@ -5924,14 +5984,15 @@ See https://github.com/odoo/owl/blob/${hash}/doc/reference/app.md#configuration 
     exports.useState = useState;
     exports.useSubEnv = useSubEnv;
     exports.validate = validate;
+    exports.validateType = validateType;
     exports.whenReady = whenReady;
     exports.xml = xml;
 
     Object.defineProperty(exports, '__esModule', { value: true });
 
 
-    __info__.date = '2023-03-13T09:56:54.968Z';
-    __info__.hash = '8893e02';
+    __info__.date = '2023-06-28T09:34:39.893Z';
+    __info__.hash = '3001420';
     __info__.url = 'https://github.com/odoo/owl';
 
 

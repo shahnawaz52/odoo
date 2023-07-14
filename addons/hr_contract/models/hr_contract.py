@@ -178,8 +178,8 @@ class Contract(models.Model):
         contracts_to_close = self.search([
             ('state', '=', 'open'),
             '|',
-            ('date_end', '<=', fields.Date.to_string(date.today() + relativedelta(days=1))),
-            ('visa_expire', '<=', fields.Date.to_string(date.today() + relativedelta(days=1))),
+            ('date_end', '<=', fields.Date.to_string(date.today())),
+            ('visa_expire', '<=', fields.Date.to_string(date.today())),
         ])
 
         if contracts_to_close:
@@ -196,7 +196,7 @@ class Contract(models.Model):
         for contract in contract_ids:
             next_contract = self.search([
                 ('employee_id', '=', contract.employee_id.id),
-                ('state', 'not in', ['cancel', 'new']),
+                ('state', 'not in', ['cancel', 'draft']),
                 ('date_start', '>', contract.date_start)
             ], order="date_start asc", limit=1)
             if next_contract:

@@ -560,11 +560,11 @@ class Lead(models.Model):
                 duplicate_lead_ids |= return_if_relevant('crm.lead', common_lead_domain + [
                     '|', ('email_normalized', 'ilike', email_search), ('email_from', 'ilike', email_search)
                 ])
-            if lead.partner_name and len(lead.partner_name) >= MIN_NAME_LENGTH:
+            if lead.partner_name and len(lead.partner_name.strip()) >= MIN_NAME_LENGTH:
                 duplicate_lead_ids |= return_if_relevant('crm.lead', common_lead_domain + [
                     ('partner_name', 'ilike', lead.partner_name)
                 ])
-            if lead.contact_name and len(lead.contact_name) >= MIN_NAME_LENGTH:
+            if lead.contact_name and len(lead.contact_name.strip()) >= MIN_NAME_LENGTH:
                 duplicate_lead_ids |= return_if_relevant('crm.lead', common_lead_domain + [
                     ('contact_name', 'ilike', lead.contact_name)
                 ])
@@ -572,11 +572,11 @@ class Lead(models.Model):
                 duplicate_lead_ids |= lead.with_context(active_test=False).search(common_lead_domain + [
                     ("partner_id", "child_of", lead.partner_id.commercial_partner_id.id)
                 ])
-            if lead.phone and len(lead.phone) >= MIN_PHONE_LENGTH:
+            if lead.phone and len(lead.phone.strip()) >= MIN_PHONE_LENGTH:
                 duplicate_lead_ids |= return_if_relevant('crm.lead', common_lead_domain + [
                     ('phone_mobile_search', 'ilike', lead.phone)
                 ])
-            if lead.mobile and len(lead.mobile) >= MIN_PHONE_LENGTH:
+            if lead.mobile and len(lead.mobile.strip()) >= MIN_PHONE_LENGTH:
                 duplicate_lead_ids |= return_if_relevant('crm.lead', common_lead_domain + [
                     ('phone_mobile_search', 'ilike', lead.mobile)
                 ])
@@ -615,12 +615,12 @@ class Lead(models.Model):
     @api.onchange('phone', 'country_id', 'company_id')
     def _onchange_phone_validation(self):
         if self.phone:
-            self.phone = self.phone_get_sanitized_number(number_fname='phone', force_format='INTERNATIONAL') or self.phone
+            self.phone = self.phone_get_sanitized_number(number_fname='phone', force_format='E164') or self.phone
 
     @api.onchange('mobile', 'country_id', 'company_id')
     def _onchange_mobile_validation(self):
         if self.mobile:
-            self.mobile = self.phone_get_sanitized_number(number_fname='mobile', force_format='INTERNATIONAL') or self.mobile
+            self.mobile = self.phone_get_sanitized_number(number_fname='mobile', force_format='E164') or self.mobile
 
     def _prepare_values_from_partner(self, partner):
         """ Get a dictionary with values coming from partner information to

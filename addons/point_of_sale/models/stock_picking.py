@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import api,fields, models
+from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_is_zero, float_compare
 
@@ -43,6 +43,7 @@ class StockPicking(models.Model):
             )
 
             positive_picking._create_move_from_pos_order_lines(positive_lines)
+            self.env.flush_all()
             try:
                 with self.env.cr.savepoint():
                     positive_picking._action_done()
@@ -62,6 +63,7 @@ class StockPicking(models.Model):
                 self._prepare_picking_vals(partner, return_picking_type, location_dest_id, return_location_id)
             )
             negative_picking._create_move_from_pos_order_lines(negative_lines)
+            self.env.flush_all()
             try:
                 with self.env.cr.savepoint():
                     negative_picking._action_done()
@@ -94,6 +96,21 @@ class StockPicking(models.Model):
         moves = self.env['stock.move'].create(move_vals)
         confirmed_moves = moves._action_confirm()
         confirmed_moves._add_mls_related_to_order(lines, are_qties_done=True)
+        self._link_owner_on_return_picking(lines)
+
+    def _link_owner_on_return_picking(self, lines):
+        """This method tries to retrieve the owner of the returned product"""
+        if lines[0].order_id.refunded_order_ids.picking_ids:
+            returned_lines_picking = lines[0].order_id.refunded_order_ids.picking_ids
+            returnable_qty_by_product = {}
+            for move_line in returned_lines_picking.move_line_ids:
+                returnable_qty_by_product[(move_line.product_id.id, move_line.owner_id.id or 0)] = move_line.qty_done
+            for move in self.move_line_ids:
+                for keys in returnable_qty_by_product:
+                    if move.product_id.id == keys[0] and keys[1] and returnable_qty_by_product[keys] > 0:
+                        move.write({'owner_id': keys[1]})
+                        returnable_qty_by_product[keys] -= move.qty_done
+
 
     def _send_confirmation_email(self):
         # Avoid sending Mail/SMS for POS deliveries
@@ -102,30 +119,41 @@ class StockPicking(models.Model):
 
     def _action_done(self):
         res = super()._action_done()
-        if self.pos_order_id.to_ship and not self.pos_order_id.to_invoice:
-            order_cost = sum(line.total_cost for line in self.pos_order_id.lines)
-            move_vals = {
-                'journal_id': self.pos_order_id.sale_journal.id,
-                'date': self.pos_order_id.date_order,
-                'ref': self.pos_order_id.name,
-                'line_ids': [
-                    (0, 0, {
-                        'name': self.pos_order_id.name,
-                        'account_id': self.product_id.categ_id.property_account_income_categ_id.id,
-                        'debit': order_cost,
-                        'credit': 0.0,
-                    }),
-                    (0, 0, {
-                        'name': self.pos_order_id.name,
-                        'account_id': self.product_id.categ_id.property_account_expense_categ_id.id,
-                        'debit': 0.0,
-                        'credit': order_cost,
+        for rec in self:
+            if rec.picking_type_id.code != 'outgoing':
+                continue
+            if rec.pos_order_id.to_ship and not rec.pos_order_id.to_invoice:
+                cost_per_account = defaultdict(lambda: 0.0)
+                for line in rec.pos_order_id.lines:
+                    if line.product_id.type != 'product':
+                        continue
+                    out = line.product_id.categ_id.property_stock_account_output_categ_id
+                    exp = line.product_id._get_product_accounts()['expense']
+                    cost_per_account[(out, exp)] += line.total_cost
+                move_vals = []
+                for (out_acc, exp_acc), cost in cost_per_account.items():
+                    move_vals.append({
+                        'journal_id': rec.pos_order_id.sale_journal.id,
+                        'date': rec.pos_order_id.date_order,
+                        'ref': rec.pos_order_id.name,
+                        'line_ids': [
+                            (0, 0, {
+                                'name': rec.pos_order_id.name,
+                                'account_id': exp_acc.id,
+                                'debit': cost,
+                                'credit': 0.0,
+                            }),
+                            (0, 0, {
+                                'name': rec.pos_order_id.name,
+                                'account_id': out_acc.id,
+                                'debit': 0.0,
+                                'credit': cost,
+                            }),
+                        ],
                     })
-                ]
-            }
-            move = self.env['account.move'].create(move_vals)
-            self.pos_order_id.write({'account_move': move.id})
-            move.action_post()
+                move = self.env['account.move'].create(move_vals)
+                rec.pos_order_id.write({'account_move': move.id})
+                move.action_post()
         return res
 
 class StockPickingType(models.Model):
@@ -137,6 +165,13 @@ class StockPickingType(models.Model):
         for picking_type in self:
             if picking_type == picking_type.warehouse_id.pos_type_id:
                 picking_type.hide_reservation_method = True
+
+    @api.constrains('active')
+    def _check_active(self):
+        for picking_type in self:
+            pos_config = self.env['pos.config'].search([('picking_type_id', '=', picking_type.id)], limit=1)
+            if pos_config:
+                raise ValidationError(_("You cannot archive '%s' as it is used by a POS configuration '%s'.", picking_type.name, pos_config.name))
 
 class ProcurementGroup(models.Model):
     _inherit = 'procurement.group'
@@ -246,7 +281,8 @@ class StockMove(models.Model):
                                 )
                             ml_vals.update({
                                 'lot_id': existing_lot.id,
-                                'location_id': quant.location_id.id or move.location_id.id
+                                'location_id': quant.location_id.id or move.location_id.id,
+                                'owner_id': quant.owner_id.id or False,
                             })
                         else:
                             ml_vals.update({'lot_name': lot.lot_name})

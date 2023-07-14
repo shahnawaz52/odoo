@@ -1,5 +1,10 @@
-.o_popover_field_selector .popover-arrow::after {
-    border-bottom-color: map-get($theme-colors, 'primary');
+.o_popover_field_selector {
+    &.o-popover-top > .popover-arrow::after {
+        border-top-color: map-get($theme-colors, 'primary');
+    }
+    &.o-popover-bottom > .popover-arrow::after {
+        border-bottom-color: map-get($theme-colors, 'primary');
+    }
 }
 
 .o_field_selector_popover:not(.o_legacy_field_selector_popover) {
@@ -50,7 +55,7 @@
     .o_field_selector_popover_body {
         .o_field_selector_page {
             position: relative;
-            max-height: 320px;
+            height: 320px;
             overflow: auto;
             margin: 0;
             padding: 0;

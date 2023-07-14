@@ -76,6 +76,8 @@ class IoTboxHomepage(Home):
         else:
             network = 'Not Connected'
 
+        is_certificate_ok, certificate_details = helpers.get_certificate_status()
+
         iot_device = []
         for device in iot_devices:
             iot_device.append({
@@ -95,6 +97,8 @@ class IoTboxHomepage(Home):
             'network_status': network,
             'version': helpers.get_version(),
             'system': platform.system(),
+            'is_certificate_ok': is_certificate_ok,
+            'certificate_details': certificate_details,
             }
 
     @http.route('/', type='http', auth='none')
@@ -248,6 +252,11 @@ class IoTboxHomepage(Home):
             'server_status': helpers.get_odoo_server_url() or 'Not configured yet',
             'loading_message': 'Configure Domain Server'
         })
+
+    # Get password
+    @http.route('/hw_posbox_homepage/password', type='json', auth='none', methods=['POST'])
+    def view_password(self):
+        return helpers.generate_password()
 
     @http.route('/remote_connect', type='http', auth='none', cors='*')
     def remote_connect(self):

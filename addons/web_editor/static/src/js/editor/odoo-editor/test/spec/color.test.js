@@ -1,4 +1,4 @@
-import { BasicEditor, testEditor } from '../utils.js';
+import { BasicEditor, testEditor, unformat } from '../utils.js';
 
 const setColor = (color, mode) => {
     return async editor => {
@@ -37,6 +37,70 @@ describe('applyColor', () => {
             contentBefore: '<p>ab[]cd</p>',
             stepFunction: setColor('rgb(255, 0, 0)', 'backgroundColor'),
             contentAfter: '<p>ab<font style="background-color: rgb(255, 0, 0);">[]\u200B</font>cd</p>',
+        });
+    });
+    it('should apply a color on empty selection', async () => {
+        await testEditor(BasicEditor, {
+            contentBefore: '<p>[<br></p><p><br></p><p>]<br></p>',
+            stepFunction: setColor('rgb(255, 0, 0)', 'color'),
+            contentAfterEdit: '<p><font data-oe-zws-empty-inline="" style="color: rgb(255, 0, 0);">[\u200B</font></p>' +
+                              '<p><font data-oe-zws-empty-inline="" style="color: rgb(255, 0, 0);">\u200B</font></p>' +
+                              '<p><font data-oe-zws-empty-inline="" style="color: rgb(255, 0, 0);">]\u200B</font></p>',
+            contentAfter: '<p>[</p><p></p><p>]</p>',
+        });
+    });
+    it('should apply a background color on empty selection', async () => {
+        await testEditor(BasicEditor, {
+            contentBefore: '<p>[<br></p><p><br></p><p>]<br></p>',
+            stepFunction: setColor('rgb(255, 0, 0)', 'background-color'),
+            contentAfterEdit: '<p><font data-oe-zws-empty-inline="" style="background-color: rgb(255, 0, 0);">[\u200B</font></p>' +
+                              '<p><font data-oe-zws-empty-inline="" style="background-color: rgb(255, 0, 0);">\u200B</font></p>' +
+                              '<p><font data-oe-zws-empty-inline="" style="background-color: rgb(255, 0, 0);">]\u200B</font></p>',
+            contentAfter: '<p>[</p><p></p><p>]</p>',
+        });
+    });
+    it('should not merge line on background color change', async () => {
+        await testEditor(BasicEditor, {
+            contentBefore: '<p><strong>[abcd</strong><br><strong>efghi]</strong></p>',
+            stepFunction: setColor('rgb(255, 0, 0)', 'backgroundColor'),
+            contentAfter: '<p><strong><font style="background-color: rgb(255, 0, 0);">[abcd</font></strong><br>' +
+                          '<strong><font style="background-color: rgb(255, 0, 0);">efghi]</font></strong></p>',
+        });
+    });
+    it('should not merge line on color change', async () => {
+        await testEditor(BasicEditor, {
+            contentBefore: '<p><strong>[abcd</strong><br><strong>efghi]</strong></p>',
+            stepFunction: setColor('rgb(255, 0, 0)', 'color'),
+            contentAfter: '<p><strong><font style="color: rgb(255, 0, 0);">[abcd</font></strong><br>' +
+                          '<strong><font style="color: rgb(255, 0, 0);">efghi]</font></strong></p>',
+        });
+    });
+    it('should not apply color on an uneditable element', async () => {
+        await testEditor(BasicEditor, {
+            contentBefore: '<p>[a</p><p contenteditable="false">b</p><p>c]</p>',
+            stepFunction: setColor('rgb(255, 0, 0)', 'color'),
+            contentAfter: unformat(`
+                <p><font style="color: rgb(255, 0, 0);">[a</font></p>
+                <p contenteditable="false">b</p>
+                <p><font style="color: rgb(255, 0, 0);">c]</font></p>
+            `),
+        });
+    });
+    it('should not apply background color on an uneditable selected cell in a table', async () => {
+        await testEditor(BasicEditor, {
+            contentBefore: unformat(`
+                <table><tbody>
+                    <tr><td>[ab</td></tr>
+                    <tr><td contenteditable="false">cd]</td></tr>
+                </tbody></table>
+            `),
+            stepFunction: setColor('rgb(255, 0, 0)', 'background-color'),
+            contentAfter: unformat(`
+                <table><tbody>
+                    <tr><td style="background-color: rgb(255, 0, 0);">[]ab</td></tr>
+                    <tr><td contenteditable="false">cd</td></tr>
+                </tbody></table>
+            `),
         });
     });
 });
